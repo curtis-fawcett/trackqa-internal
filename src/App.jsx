@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Routes, Route, useNavigate, useParams } from "react-router-dom";
+import {
+  Routes,
+  Route,
+  useNavigate,
+  useParams,
+  useLocation,
+} from "react-router-dom";
 
 const STORAGE_KEY = "trackqa-data-v2";
 
@@ -175,6 +181,8 @@ function createInitialData() {
 }
 
 function App() {
+  const [showNewTicket, setShowNewTicket] = useState(false);
+
   const [data, setData] = useState(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -211,10 +219,9 @@ function App() {
   });
 
   const [search, setSearch] = useState("");
-  const [expandedTickets, setExpandedTickets] = useState({});
-  const [timelineDrafts, setTimelineDrafts] = useState({});
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -225,6 +232,25 @@ function App() {
       setSelectedProjectId(data.projects[0].id);
     }
   }, [data.projects, selectedProjectId]);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        setData(JSON.parse(stored));
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
+  }, []);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      setData(JSON.parse(stored));
+    }
+  }, [location.pathname]);
 
   const selectedProject = useMemo(
     () =>
@@ -313,47 +339,8 @@ function App() {
       resolutionSummary: "",
       qaVerification: "",
     });
-  }
 
-  function toggleTicketDetails(ticketId) {
-    setExpandedTickets((current) => ({
-      ...current,
-      [ticketId]: !current[ticketId],
-    }));
-  }
-
-  function addTimelineEntry(ticketId, note) {
-    if (!note.trim()) return;
-
-    const entry = {
-      id: crypto.randomUUID(),
-      note: note.trim(),
-      createdAt: new Date().toISOString(),
-    };
-
-    setData((current) => ({
-      ...current,
-      tickets: current.tickets.map((ticket) =>
-        ticket.id === ticketId
-          ? {
-              ...ticket,
-              timeline: [entry, ...(ticket.timeline || [])],
-              updatedAt: new Date().toISOString(),
-            }
-          : ticket
-      ),
-    }));
-  }
-
-  function updateTicket(ticketId, updates) {
-    setData((current) => ({
-      ...current,
-      tickets: current.tickets.map((ticket) =>
-        ticket.id === ticketId
-          ? { ...ticket, ...updates, updatedAt: new Date().toISOString() }
-          : ticket
-      ),
-    }));
+    setShowNewTicket(false);
   }
 
   function moveTicket(ticketId, direction) {
@@ -365,7 +352,18 @@ function App() {
 
     if (nextIndex < 0 || nextIndex >= STATUSES.length) return;
 
-    updateTicket(ticketId, { status: STATUSES[nextIndex] });
+    setData((current) => ({
+      ...current,
+      tickets: current.tickets.map((item) =>
+        item.id === ticketId
+          ? {
+              ...item,
+              status: STATUSES[nextIndex],
+              updatedAt: new Date().toISOString(),
+            }
+          : item
+      ),
+    }));
   }
 
   function deleteTicket(ticketId) {
@@ -383,24 +381,30 @@ function App() {
     setData(initial);
     setSelectedProjectId(initial.projects[0]?.id || "");
     localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+    setShowNewTicket(false);
   }
 
   return (
     <Routes>
-      <Route 
-        path="/" 
+      <Route
+        path="/"
         element={
           <div style={appShellStyle}>
             <div style={pageContainerStyle}>
               <header style={headerStyle}>
                 <div>
                   <p style={eyebrowStyle}>Internal QA Workspace</p>
-                  <h1 style={{ margin: "8px 0 0", fontSize: 48, color: "#f8fafc" }}>
+                  <h1
+                    style={{ margin: "8px 0 0", fontSize: 48, color: "#f8fafc" }}
+                  >
                     TrackQA
                   </h1>
-                  <p style={{ margin: "8px 0 0", color: "#94a3b8", maxWidth: 760 }}>
-                    A dark internal dashboard for tracking bugs, refactors, technical
-                    debt, performance issues, and regression-related QA work.
+                  <p
+                    style={{ margin: "8px 0 0", color: "#94a3b8", maxWidth: 760 }}
+                  >
+                    A dark internal dashboard for tracking bugs, refactors,
+                    technical debt, performance issues, and regression-related QA
+                    work.
                   </p>
                 </div>
 
@@ -428,7 +432,11 @@ function App() {
                         >
                           <div style={{ fontWeight: 700 }}>{project.name}</div>
                           <div
-                            style={{ marginTop: 6, fontSize: 13, color: "#94a3b8" }}
+                            style={{
+                              marginTop: 6,
+                              fontSize: 13,
+                              color: "#94a3b8",
+                            }}
                           >
                             {project.description || "No description"}
                           </div>
@@ -504,14 +512,16 @@ function App() {
                         <StatCard
                           label="Critical"
                           value={
-                            filteredTickets.filter((t) => t.priority === "CRITICAL")
-                              .length
+                            filteredTickets.filter(
+                              (t) => t.priority === "CRITICAL"
+                            ).length
                           }
                         />
                         <StatCard
                           label="Tags"
                           value={
-                            new Set(filteredTickets.flatMap((t) => t.tags || [])).size
+                            new Set(filteredTickets.flatMap((t) => t.tags || []))
+                              .size
                           }
                         />
                       </div>
@@ -519,171 +529,191 @@ function App() {
                   </section>
 
                   <section style={{ ...panelStyle, marginTop: 24 }}>
-                    <h3 style={panelHeadingStyle}>New Ticket</h3>
-
-                    <form
-                      onSubmit={handleCreateTicket}
-                      style={{ display: "grid", gap: 12 }}
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
                     >
-                      <div style={ticketFormGridStyle}>
-                        <input
-                          value={ticketForm.title}
+                      <h3 style={{ ...panelHeadingStyle, margin: 0 }}>
+                        New Ticket
+                      </h3>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowNewTicket((prev) => !prev)}
+                        style={secondaryButtonStyle}
+                      >
+                        {showNewTicket ? "Close" : "New Ticket"}
+                      </button>
+                    </div>
+
+                    {showNewTicket && (
+                      <form
+                        onSubmit={handleCreateTicket}
+                        style={{ display: "grid", gap: 12, marginTop: 16 }}
+                      >
+                        <div style={ticketFormGridStyle}>
+                          <input
+                            value={ticketForm.title}
+                            onChange={(e) =>
+                              setTicketForm((current) => ({
+                                ...current,
+                                title: e.target.value,
+                              }))
+                            }
+                            placeholder="Ticket title"
+                            style={inputStyle}
+                          />
+
+                          <select
+                            value={ticketForm.type}
+                            onChange={(e) =>
+                              setTicketForm((current) => ({
+                                ...current,
+                                type: e.target.value,
+                              }))
+                            }
+                            style={inputStyle}
+                          >
+                            {TYPES.map((type) => (
+                              <option key={type} value={type}>
+                                {formatLabel(type)}
+                              </option>
+                            ))}
+                          </select>
+
+                          <select
+                            value={ticketForm.status}
+                            onChange={(e) =>
+                              setTicketForm((current) => ({
+                                ...current,
+                                status: e.target.value,
+                              }))
+                            }
+                            style={inputStyle}
+                          >
+                            {STATUSES.map((status) => (
+                              <option key={status} value={status}>
+                                {formatLabel(status)}
+                              </option>
+                            ))}
+                          </select>
+
+                          <select
+                            value={ticketForm.priority}
+                            onChange={(e) =>
+                              setTicketForm((current) => ({
+                                ...current,
+                                priority: e.target.value,
+                              }))
+                            }
+                            style={inputStyle}
+                          >
+                            {PRIORITIES.map((priority) => (
+                              <option key={priority} value={priority}>
+                                {formatLabel(priority)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <textarea
+                          rows={3}
+                          value={ticketForm.description}
                           onChange={(e) =>
                             setTicketForm((current) => ({
                               ...current,
-                              title: e.target.value,
+                              description: e.target.value,
                             }))
                           }
-                          placeholder="Ticket title"
+                          placeholder="Describe the issue, task, or QA check"
+                          style={{ ...inputStyle, resize: "vertical" }}
+                        />
+
+                        <input
+                          value={ticketForm.tagsInput}
+                          onChange={(e) =>
+                            setTicketForm((current) => ({
+                              ...current,
+                              tagsInput: e.target.value,
+                            }))
+                          }
+                          placeholder="Tags (comma separated: api, auth, ui)"
                           style={inputStyle}
                         />
 
-                        <select
-                          value={ticketForm.type}
+                        <textarea
+                          rows={3}
+                          value={ticketForm.notes}
                           onChange={(e) =>
                             setTicketForm((current) => ({
                               ...current,
-                              type: e.target.value,
+                              notes: e.target.value,
                             }))
                           }
-                          style={inputStyle}
-                        >
-                          {TYPES.map((type) => (
-                            <option key={type} value={type}>
-                              {formatLabel(type)}
-                            </option>
-                          ))}
-                        </select>
+                          placeholder="Internal notes"
+                          style={{ ...inputStyle, resize: "vertical" }}
+                        />
 
-                        <select
-                          value={ticketForm.status}
+                        <textarea
+                          rows={3}
+                          value={ticketForm.reproductionSteps}
                           onChange={(e) =>
                             setTicketForm((current) => ({
                               ...current,
-                              status: e.target.value,
+                              reproductionSteps: e.target.value,
                             }))
                           }
-                          style={inputStyle}
-                        >
-                          {STATUSES.map((status) => (
-                            <option key={status} value={status}>
-                              {formatLabel(status)}
-                            </option>
-                          ))}
-                        </select>
+                          placeholder="Reproduction steps"
+                          style={{ ...inputStyle, resize: "vertical" }}
+                        />
 
-                        <select
-                          value={ticketForm.priority}
+                        <textarea
+                          rows={3}
+                          value={ticketForm.rootCause}
                           onChange={(e) =>
                             setTicketForm((current) => ({
                               ...current,
-                              priority: e.target.value,
+                              rootCause: e.target.value,
                             }))
                           }
-                          style={inputStyle}
-                        >
-                          {PRIORITIES.map((priority) => (
-                            <option key={priority} value={priority}>
-                              {formatLabel(priority)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                          placeholder="Root cause"
+                          style={{ ...inputStyle, resize: "vertical" }}
+                        />
 
-                      <textarea
-                        rows={3}
-                        value={ticketForm.description}
-                        onChange={(e) =>
-                          setTicketForm((current) => ({
-                            ...current,
-                            description: e.target.value,
-                          }))
-                        }
-                        placeholder="Describe the issue, task, or QA check"
-                        style={{ ...inputStyle, resize: "vertical" }}
-                      />
+                        <textarea
+                          rows={3}
+                          value={ticketForm.resolutionSummary}
+                          onChange={(e) =>
+                            setTicketForm((current) => ({
+                              ...current,
+                              resolutionSummary: e.target.value,
+                            }))
+                          }
+                          placeholder="Resolution summary"
+                          style={{ ...inputStyle, resize: "vertical" }}
+                        />
 
-                      <input
-                        value={ticketForm.tagsInput}
-                        onChange={(e) =>
-                          setTicketForm((current) => ({
-                            ...current,
-                            tagsInput: e.target.value,
-                          }))
-                        }
-                        placeholder="Tags (comma separated: api, auth, ui)"
-                        style={inputStyle}
-                      />
+                        <textarea
+                          rows={3}
+                          value={ticketForm.qaVerification}
+                          onChange={(e) =>
+                            setTicketForm((current) => ({
+                              ...current,
+                              qaVerification: e.target.value,
+                            }))
+                          }
+                          placeholder="QA verification"
+                          style={{ ...inputStyle, resize: "vertical" }}
+                        />
 
-                      <textarea
-                        rows={3}
-                        value={ticketForm.notes}
-                        onChange={(e) =>
-                          setTicketForm((current) => ({
-                            ...current,
-                            notes: e.target.value,
-                          }))
-                        }
-                        placeholder="Internal notes, reproduction steps, retest notes"
-                        style={{ ...inputStyle, resize: "vertical" }}
-                      />
-
-                      <textarea
-                        rows={3}
-                        value={ticketForm.reproductionSteps}
-                        onChange={(e) =>
-                          setTicketForm((current) => ({
-                            ...current,
-                            reproductionSteps: e.target.value,
-                          }))
-                        }
-                        placeholder="Reproduction steps"
-                        style={{ ...inputStyle, resize: "vertical" }}
-                      />
-
-                      <textarea
-                        rows={3}
-                        value={ticketForm.rootCause}
-                        onChange={(e) =>
-                          setTicketForm((current) => ({
-                            ...current,
-                            rootCause: e.target.value,
-                          }))
-                        }
-                        placeholder="Root cause"
-                        style={{ ...inputStyle, resize: "vertical" }}
-                      />
-
-                      <textarea
-                        rows={3}
-                        value={ticketForm.resolutionSummary}
-                        onChange={(e) =>
-                          setTicketForm((current) => ({
-                            ...current,
-                            resolutionSummary: e.target.value,
-                          }))
-                        }
-                        placeholder="Resolution summary"
-                        style={{ ...inputStyle, resize: "vertical" }}
-                      />
-
-                      <textarea
-                        rows={3}
-                        value={ticketForm.qaVerification}
-                        onChange={(e) =>
-                          setTicketForm((current) => ({
-                            ...current,
-                            qaVerification: e.target.value,
-                          }))
-                        }
-                        placeholder="QA verification"
-                        style={{ ...inputStyle, resize: "vertical" }}
-                      />
-
-                      <button type="submit" style={primaryButtonStyle}>
-                        Add Ticket
-                      </button>
-                    </form>
+                        <button type="submit" style={primaryButtonStyle}>
+                          Add Ticket
+                        </button>
+                      </form>
+                    )}
                   </section>
 
                   <section style={{ ...panelStyle, marginTop: 24 }}>
@@ -730,8 +760,15 @@ function App() {
                                           gap: 8,
                                         }}
                                       >
-                                        <div style={{ flex: 1, minWidth: 0, cursor: "pointer" }}
-                                          onClick={() => navigate(`/ticket/${ticket.id}`)}
+                                        <div
+                                          style={{
+                                            flex: 1,
+                                            minWidth: 0,
+                                            cursor: "pointer",
+                                          }}
+                                          onClick={() =>
+                                            navigate(`/ticket/${ticket.id}`)
+                                          }
                                         >
                                           <textarea
                                             rows={2}
@@ -772,242 +809,18 @@ function App() {
                                         ))}
                                       </div>
 
-                                      <textarea
-                                        rows={3}
-                                        value={ticket.description}
-                                        onChange={(e) =>
-                                          updateTicket(ticket.id, {
-                                            description: e.target.value,
-                                          })
-                                        }
-                                        style={{
-                                          ...inputStyle,
-                                          marginTop: 12,
-                                          resize: "vertical",
-                                        }}
-                                        placeholder="Description"
-                                      />
-
-                                      <input
-                                        value={(ticket.tags || []).join(", ")}
-                                        onChange={(e) =>
-                                          updateTicket(ticket.id, {
-                                            tags: parseTags(e.target.value),
-                                          })
-                                        }
-                                        placeholder="Tags (comma separated)"
-                                        style={{ ...inputStyle, marginTop: 12 }}
-                                      />
-
-                                      <textarea
-                                        rows={3}
-                                        value={ticket.notes}
-                                        onChange={(e) =>
-                                          updateTicket(ticket.id, {
-                                            notes: e.target.value,
-                                          })
-                                        }
-                                        style={{
-                                          ...inputStyle,
-                                          marginTop: 12,
-                                          resize: "vertical",
-                                        }}
-                                        placeholder="Notes"
-                                      />
-
-                                      <button
-                                        type="button"
-                                        onClick={() => toggleTicketDetails(ticket.id)}
-                                        style={{
-                                          ...secondaryButtonStyle,
-                                          marginTop: 12,
-                                          width: "100%",
-                                          textAlign: "left",
-                                        }}
-                                      >
-                                        {expandedTickets[ticket.id]
-                                          ? "Hide Investigation Details"
-                                          : "Show Investigation Details"}
-                                      </button>
-
-                                      {expandedTickets[ticket.id] && (
-                                        <>
-                                          <textarea
-                                            rows={3}
-                                            value={ticket.reproductionSteps}
-                                            onChange={(e) =>
-                                              updateTicket(ticket.id, {
-                                                reproductionSteps: e.target.value,
-                                              })
-                                            }
-                                            style={{
-                                              ...inputStyle,
-                                              marginTop: 12,
-                                              resize: "vertical",
-                                            }}
-                                            placeholder="Reproduction steps"
-                                          />
-
-                                          <textarea
-                                            rows={3}
-                                            value={ticket.rootCause}
-                                            onChange={(e) =>
-                                              updateTicket(ticket.id, {
-                                                rootCause: e.target.value,
-                                              })
-                                            }
-                                            style={{
-                                              ...inputStyle,
-                                              marginTop: 12,
-                                              resize: "vertical",
-                                            }}
-                                            placeholder="Root cause"
-                                          />
-
-                                          <textarea
-                                            rows={3}
-                                            value={ticket.resolutionSummary}
-                                            onChange={(e) =>
-                                              updateTicket(ticket.id, {
-                                                resolutionSummary: e.target.value,
-                                              })
-                                            }
-                                            style={{
-                                              ...inputStyle,
-                                              marginTop: 12,
-                                              resize: "vertical",
-                                            }}
-                                            placeholder="Resolution summary"
-                                          />
-
-                                          <textarea
-                                            rows={3}
-                                            value={ticket.qaVerification}
-                                            onChange={(e) =>
-                                              updateTicket(ticket.id, {
-                                                qaVerification: e.target.value,
-                                              })
-                                            }
-                                            style={{
-                                              ...inputStyle,
-                                              marginTop: 12,
-                                              resize: "vertical",
-                                            }}
-                                            placeholder="QA verification"
-                                          />
-                                        </>
+                                      {ticket.description && (
+                                        <p
+                                          style={{
+                                            marginTop: 8,
+                                            fontSize: 13,
+                                            color: "#64748b",
+                                            lineHeight: 1.5,
+                                          }}
+                                        >
+                                          {ticket.description}
+                                        </p>
                                       )}
-
-                                      <div
-                                        style={{
-                                          marginTop: 12,
-                                          borderTop: "1px solid #1e293b",
-                                          paddingTop: 12,
-                                        }}
-                                      >
-                                        <div
-                                          style={{
-                                            fontSize: 12,
-                                            fontWeight: 700,
-                                            letterSpacing: "0.08em",
-                                            textTransform: "uppercase",
-                                            color: "#10b981",
-                                            marginBottom: 10,
-                                          }}
-                                        >
-                                          Debug Timeline
-                                        </div>
-
-                                        <div style={{ display: "grid", gap: 8 }}>
-                                          <textarea
-                                            rows={2}
-                                            value={timelineDrafts[ticket.id] || ""}
-                                            onChange={(e) =>
-                                              setTimelineDrafts((current) => ({
-                                                ...current,
-                                                [ticket.id]: e.target.value,
-                                              }))
-                                            }
-                                            placeholder="Add timeline entry: reproduced bug, traced route, found root cause..."
-                                            style={{
-                                              ...inputStyle,
-                                              resize: "vertical",
-                                            }}
-                                          />
-
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              addTimelineEntry(
-                                                ticket.id,
-                                                timelineDrafts[ticket.id] || ""
-                                              );
-                                              setTimelineDrafts((current) => ({
-                                                ...current,
-                                                [ticket.id]: "",
-                                              }));
-                                            }}
-                                            style={secondaryButtonStyle}
-                                          >
-                                            Add Timeline Entry
-                                          </button>
-                                        </div>
-
-                                        <div
-                                          style={{
-                                            display: "grid",
-                                            gap: 8,
-                                            marginTop: 12,
-                                          }}
-                                        >
-                                          {(ticket.timeline || []).length === 0 ? (
-                                            <div
-                                              style={{
-                                                border: "1px dashed #334155",
-                                                borderRadius: 12,
-                                                padding: 12,
-                                                color: "#64748b",
-                                                fontSize: 13,
-                                              }}
-                                            >
-                                              No timeline entries yet.
-                                            </div>
-                                          ) : (
-                                            (ticket.timeline || []).map((entry) => (
-                                              <div
-                                                key={entry.id}
-                                                style={{
-                                                  border: "1px solid #1e293b",
-                                                  background: "#020617",
-                                                  borderRadius: 12,
-                                                  padding: 12,
-                                                }}
-                                              >
-                                                <div
-                                                  style={{
-                                                    fontSize: 12,
-                                                    color: "#64748b",
-                                                    marginBottom: 6,
-                                                  }}
-                                                >
-                                                  {new Date(
-                                                    entry.createdAt
-                                                  ).toLocaleString()}
-                                                </div>
-                                                <div
-                                                  style={{
-                                                    fontSize: 14,
-                                                    color: "#e2e8f0",
-                                                    lineHeight: 1.5,
-                                                  }}
-                                                >
-                                                  {entry.note}
-                                                </div>
-                                              </div>
-                                            ))
-                                          )}
-                                        </div>
-                                      </div>
 
                                       <div style={ticketFooterRowStyle}>
                                         <div style={{ display: "flex", gap: 8 }}>
@@ -1085,18 +898,225 @@ function App() {
 
 function TicketPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
+
+  const stored = localStorage.getItem(STORAGE_KEY);
+  const parsed = stored ? JSON.parse(stored) : null;
+  const ticket = parsed?.tickets?.find((ticket) => ticket.id === id);
+
+  const [notesDraft, setNotesDraft] = useState(ticket?.notes || "");
+  const [reproductionStepsDraft, setReproductionStepsDraft] = useState(
+    ticket?.reproductionSteps || ""
+  );
+  const [rootCauseDraft, setRootCauseDraft] = useState(ticket?.rootCause || "");
+  const [resolutionSummaryDraft, setResolutionSummaryDraft] = useState(
+    ticket?.resolutionSummary || ""
+  );
+  const [qaVerificationDraft, setQaVerificationDraft] = useState(
+    ticket?.qaVerification || ""
+  );
+  const [saveStatus, setSaveStatus] = useState("idle");
+
+  function saveField(field, value) {
+    setSaveStatus("saving");
+
+    const updatedData = {
+      ...parsed,
+      tickets: parsed.tickets.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              [field]: value,
+              updatedAt: new Date().toISOString(),
+            }
+          : item
+      ),
+    };
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedData));
+
+    setTimeout(() => {
+      setSaveStatus("saved");
+    }, 200);
+
+    setTimeout(() => {
+      setSaveStatus("idle");
+    }, 1500);
+  }
+
+  if (!ticket) {
+    return (
+      <div style={appShellStyle}>
+        <div style={pageContainerStyle}>
+          <div style={panelStyle}>
+            <p style={eyebrowStyle}>Ticket Workspace</p>
+            <h1 style={{ margin: "8px 0 0", fontSize: 36, color: "#f8fafc" }}>
+              Ticket Not Found
+            </h1>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={appShellStyle}>
       <div style={pageContainerStyle}>
         <div style={panelStyle}>
+          <button
+            onClick={() => navigate("/")}
+            style={{ ...secondaryButtonStyle, marginBottom: 16 }}
+          >
+            ← Back to Dashboard
+          </button>
+
           <p style={eyebrowStyle}>Ticket Workspace</p>
+
           <h1 style={{ margin: "8px 0 0", fontSize: 36, color: "#f8fafc" }}>
-            Ticket Page
+            {ticket.title}
           </h1>
-          <p style={{ margin: "12px 0 0", color: "#94a3b8" }}>
-            Ticket ID: {id}
+
+          <div style={{ marginTop: 8, fontSize: 13, color: "#64748b" }}>
+            {saveStatus === "saving" && "Saving..."}
+            {saveStatus === "saved" && "Saved ✓"}
+          </div>
+
+          <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <Badge tone={getTypeTone(ticket.type)}>
+              {formatLabel(ticket.type)}
+            </Badge>
+
+            <Badge tone={getPriorityTone(ticket.priority)}>
+              {formatLabel(ticket.priority)}
+            </Badge>
+
+            {(ticket.tags || []).map((tag) => (
+              <Badge key={tag}>#{tag}</Badge>
+            ))}
+          </div>
+
+          <p style={{ marginTop: 8, fontSize: 13, color: "#64748b" }}>
+            {ticket.description || "No description provided."}
           </p>
+
+          <hr style={{ margin: "20px 0", border: "1px solid #1e293b" }} />
+
+          <div style={{ marginTop: 24 }}>
+            <p style={{ color: "#f8fafc", fontSize: 16, fontWeight: 700 }}>
+              Notes
+            </p>
+
+            <textarea
+              rows={5}
+              value={notesDraft}
+              onChange={(e) => setNotesDraft(e.target.value)}
+              style={{ ...inputStyle, marginTop: 8, resize: "vertical" }}
+              placeholder="Add notes..."
+            />
+
+            <button
+              type="button"
+              onClick={() => saveField("notes", notesDraft)}
+              style={{ ...secondaryButtonStyle, marginTop: 12 }}
+            >
+              Save Notes
+            </button>
+          </div>
+
+          <div style={{ marginTop: 24 }}>
+            <p style={{ color: "#f8fafc", fontSize: 16, fontWeight: 700 }}>
+              Reproduction Steps
+            </p>
+
+            <textarea
+              rows={5}
+              value={reproductionStepsDraft}
+              onChange={(e) => setReproductionStepsDraft(e.target.value)}
+              style={{ ...inputStyle, marginTop: 8, resize: "vertical" }}
+              placeholder="Add reproduction steps..."
+            />
+
+            <button
+              type="button"
+              onClick={() =>
+                saveField("reproductionSteps", reproductionStepsDraft)
+              }
+              style={{ ...secondaryButtonStyle, marginTop: 12 }}
+            >
+              Save Reproduction Steps
+            </button>
+          </div>
+
+          <div style={{ marginTop: 24 }}>
+            <p style={{ color: "#f8fafc", fontSize: 16, fontWeight: 700 }}>
+              Root Cause
+            </p>
+
+            <textarea
+              rows={5}
+              value={rootCauseDraft}
+              onChange={(e) => setRootCauseDraft(e.target.value)}
+              style={{ ...inputStyle, marginTop: 8, resize: "vertical" }}
+              placeholder="Add root cause analysis..."
+            />
+
+            <button
+              type="button"
+              onClick={() => saveField("rootCause", rootCauseDraft)}
+              style={{ ...secondaryButtonStyle, marginTop: 12 }}
+            >
+              Save Root Cause
+            </button>
+          </div>
+
+          {["READY_FOR_TEST", "VERIFIED", "CLOSED"].includes(ticket.status) && (
+            <div style={{ marginTop: 24 }}>
+              <p style={{ color: "#f8fafc", fontSize: 16, fontWeight: 700 }}>
+                Resolution Summary
+              </p>
+
+              <textarea
+                rows={5}
+                value={resolutionSummaryDraft}
+                onChange={(e) => setResolutionSummaryDraft(e.target.value)}
+                style={{ ...inputStyle, marginTop: 8, resize: "vertical" }}
+                placeholder="Add resolution summary..."
+              />
+
+              <button
+                type="button"
+                onClick={() =>
+                  saveField("resolutionSummary", resolutionSummaryDraft)
+                }
+                style={{ ...secondaryButtonStyle, marginTop: 12 }}
+              >
+                Save Resolution Summary
+              </button>
+            </div>
+          )}
+
+          {["VERIFIED", "CLOSED"].includes(ticket.status) && (
+            <div style={{ marginTop: 24 }}>
+              <p style={{ color: "#f8fafc", fontSize: 16, fontWeight: 700 }}>
+                QA Verification
+              </p>
+              <textarea
+                rows={5}
+                value={qaVerificationDraft}
+                onChange={(e) => setQaVerificationDraft(e.target.value)}
+                style={{ ...inputStyle, marginTop: 8, resize: "vertical" }}
+                placeholder="Add QA verification details..."
+              />
+
+              <button
+                type="button"
+                onClick={() => saveField("qaVerification", qaVerificationDraft)}
+                style={{ ...secondaryButtonStyle, marginTop: 12 }}
+              >
+                Save QA Verification
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
