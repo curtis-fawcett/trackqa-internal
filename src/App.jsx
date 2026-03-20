@@ -6,6 +6,7 @@ import {
   useParams,
   useLocation,
 } from "react-router-dom";
+import TrackQA from "./case-studies/trackqa/TrackQA";
 
 const STORAGE_KEY = "trackqa-data-v2";
 
@@ -239,121 +240,9 @@ function addTimelineEntry(ticket, message) {
 }
 
 function createInitialData() {
-  const projectId = crypto.randomUUID();
-  const now = new Date().toISOString();
-
   return {
-    projects: [
-      {
-        id: projectId,
-        name: "BackendRescue Website",
-        description: "Internal tasks, fixes, and QA checks for the website.",
-      },
-    ],
-    tickets: [
-      {
-        id: crypto.randomUUID(),
-        projectId,
-        title: "Review mobile navigation behavior",
-        description:
-          "Check menu open/close behavior and spacing on smaller screens.",
-        type: "BUG",
-        status: "OPEN",
-        priority: "MEDIUM",
-        owner: "OWNER",
-        tags: ["ui", "mobile"],
-        notes: "Test on phone and desktop after deploy.",
-        reproductionSteps: "",
-        rootCause: "",
-        resolutionSummary: "",
-        qaVerification: "",
-        timeline: [
-          {
-            id: crypto.randomUUID(),
-            message: "Ticket created.",
-            createdAt: now,
-          },
-          {
-            id: crypto.randomUUID(),
-            message: "Owner set to OWNER.",
-            createdAt: now,
-          },
-        ],
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: crypto.randomUUID(),
-        projectId,
-        title: "Refine hero section spacing",
-        description:
-          "Tighten spacing and improve visual balance in the hero area.",
-        type: "REFACTOR",
-        status: "IN_PROGRESS",
-        priority: "LOW",
-        owner: "FRONTEND",
-        tags: ["ui", "layout"],
-        notes: "Compare desktop and mobile.",
-        reproductionSteps: "",
-        rootCause: "",
-        resolutionSummary: "",
-        qaVerification: "",
-        timeline: [
-          {
-            id: crypto.randomUUID(),
-            message: "Ticket created.",
-            createdAt: now,
-          },
-          {
-            id: crypto.randomUUID(),
-            message: "Owner set to FRONTEND.",
-            createdAt: now,
-          },
-          {
-            id: crypto.randomUUID(),
-            message: "Status changed from OPEN to IN PROGRESS.",
-            createdAt: now,
-          },
-        ],
-        createdAt: now,
-        updatedAt: now,
-      },
-      {
-        id: crypto.randomUUID(),
-        projectId,
-        title: "Verify Open Graph preview image",
-        description: "Check LinkedIn and other previews after metadata updates.",
-        type: "BUG",
-        status: "READY_FOR_TEST",
-        priority: "HIGH",
-        owner: "QA",
-        tags: ["seo", "social"],
-        notes: "Retest after deployment.",
-        reproductionSteps: "",
-        rootCause: "",
-        resolutionSummary: "",
-        qaVerification: "",
-        timeline: [
-          {
-            id: crypto.randomUUID(),
-            message: "Ticket created.",
-            createdAt: now,
-          },
-          {
-            id: crypto.randomUUID(),
-            message: "Owner set to QA.",
-            createdAt: now,
-          },
-          {
-            id: crypto.randomUUID(),
-            message: "Status changed from OPEN to READY FOR TEST.",
-            createdAt: now,
-          },
-        ],
-        createdAt: now,
-        updatedAt: now,
-      },
-    ],
+    projects: [],
+    tickets: [],
   };
 }
 
@@ -845,9 +734,23 @@ function App() {
                     </p>
                   </div>
 
-                  <button onClick={resetDemoData} style={secondaryButtonStyle}>
-                    Reset Demo Data
-                  </button>
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                    <button
+                      onClick={() => navigate("/trackqa-case-study")}
+                      style={secondaryButtonStyle}
+                      type="button"
+                    >
+                      View Case Study
+                    </button>
+
+                    <button
+                      onClick={resetDemoData}
+                      style={secondaryButtonStyle}
+                      type="button"
+                    >
+                      Clear Workspace
+                    </button>
+                  </div>
                 </header>
 
                 <div style={layoutStyle}>
@@ -1241,6 +1144,7 @@ function App() {
           }
         />
 
+        <Route path="/trackqa-case-study" element={<TrackQA />} />
         <Route path="/ticket/:id" element={<TicketPage />} />
       </Routes>
 
