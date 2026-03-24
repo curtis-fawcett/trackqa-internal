@@ -1,6 +1,6 @@
 TrackQA (Internal)
 
-![TrackQA Dashboard](./trackqa-dashboard.png)
+![TrackQA Dashboard](trackqa-dashboard.png)
 
 Internal QA and debugging workflow dashboard for tracking bugs, refactors, investigations, and verification tasks across projects.
 
